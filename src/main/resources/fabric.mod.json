@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"id": "seclosiautils",
+	"version": "${version}",
+	"name": "SeclosiaUtils",
+	"description": "This is an utility mod for Seclosia",
+	"authors": [
+		"MrQuba"
+	],
+	"contact": {
+		"sources": "https://github.com/MrQuba/seclosia-utils"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/seclosiautils/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"net.mrquba.seclosia.SeclosiaUtils"
+		],
+		"client": [
+			"net.mrquba.seclosia.SeclosiaUtilsClient"
+		],
+		"fabric-datagen": [
+			"net.mrquba.seclosia.SeclosiaUtilsDataGenerator"
+		]
+	},
+	"mixins": [
+		"seclosiautils.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.15.7",
+		"minecraft": "~1.20",
+		"java": ">=17",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
