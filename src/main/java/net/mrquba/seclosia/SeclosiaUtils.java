@@ -31,10 +31,11 @@ public class SeclosiaUtils implements ModInitializer {
 	public void onInitialize() {
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			SeclosiaUtils.dispatcher = dispatcher;
-			this.commands = conf.loadConfig(conf.COMMANDS_FILE);
-			init(dispatcher);
-			this.locations = conf.loadConfig(conf.LOCATIONS_FILE, true);
-			init(true);
+			this.commands = conf.loadConfig(SeclosiaUtilsConfig.COMMANDS_FILE);
+			init(SeclosiaUtils.dispatcher);
+			this.commands.clear();
+			this.locations = conf.loadConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, true);
+			init(SeclosiaUtils.dispatcher, true);
 			executionCommandRegistration(dispatcher, "seclosia", "get_seed", "seed");
 			addCommandRegistration(dispatcher, "seclosia");
 		});
@@ -91,7 +92,7 @@ public class SeclosiaUtils implements ModInitializer {
 																			this.locations.add(new Pair<>(locationName, locationPos));
 																			context.getSource().sendFeedback(() ->
 																					Text.literal("Added location %s at coordinates: %s".formatted(locationName, locationPos)), false);
-																			init(true);
+																			init(SeclosiaUtils.dispatcher, true);
                                                                             return 1;
                                                                         })
 																)
@@ -105,13 +106,15 @@ public class SeclosiaUtils implements ModInitializer {
 	private void init(CommandDispatcher<ServerCommandSource> dispatcher) {
 		for (Pair<String, String> s : this.commands) {
 			executionCommandRegistration(dispatcher, "seclosia", s.getLeft(), s.getRight());
-			conf.saveConfig(conf.COMMANDS_FILE, this.commands);
 		}
+		conf.saveConfig(SeclosiaUtilsConfig.COMMANDS_FILE, this.commands);
+		this.commands.clear();
 	}
-	private void init(boolean location) {
+	private void init(CommandDispatcher<ServerCommandSource> dispatcher, boolean location) {
 		for (Pair<String, Vec3i> s : this.locations) {
-			executionCommandRegistration(SeclosiaUtils.dispatcher, "seclosia", "location", s.getLeft(), s.getRight());
-			conf.saveConfig(conf.LOCATIONS_FILE, this.locations, true);
+			executionCommandRegistration(dispatcher, "seclosia", "location", s.getLeft(), s.getRight());
 		}
+		conf.saveConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, this.locations);
+		this.locations.clear();
 	}
 }
