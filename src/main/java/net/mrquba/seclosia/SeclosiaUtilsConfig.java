@@ -2,6 +2,7 @@ package net.mrquba.seclosia;
 import net.minecraft.util.Pair;
 import net.minecraft.util.math.Vec3i;
 import org.apache.commons.lang3.tuple.Triple;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.util.*;
@@ -20,7 +21,7 @@ public class SeclosiaUtilsConfig {
     // Pre-defined files SeclosiaUtilsConfig::COMMANDS_FILE, SeclosiaUtilsConfig::LOCATIONS_FILE
     public List<Pair<String, String>> loadConfig(File file) {
         // variable declarations
-        List<Pair<String, String>> conf;
+        List<Pair<String, String>> conf = new LinkedList<>();
         List<String> keyRing = new LinkedList<>();
         List<String> values = new LinkedList<>();
         try {
@@ -34,7 +35,7 @@ public class SeclosiaUtilsConfig {
             }
             conf = zipLists(keyRing, values);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            createEmptyPropertiesFile("config/seclosia_commands.properties");
         }
         properties.clear();
         properties = new Properties();
@@ -50,7 +51,7 @@ public class SeclosiaUtilsConfig {
 
         // variable declarations
         List<Pair<String, Vec3i>> conf;
-        List<String> keyRing;
+        List<String> keyRing = new LinkedList<>();
         List<Vec3i> values = new LinkedList<>();
         try {
             FileInputStream inputStream = new FileInputStream(file);
@@ -69,7 +70,7 @@ public class SeclosiaUtilsConfig {
             }
 
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            createEmptyPropertiesFile("config/seclosia_locations.properties");
         }
         conf = zipLists(keyRing, values);
         properties.clear();
@@ -77,6 +78,14 @@ public class SeclosiaUtilsConfig {
         keyRing.clear();
         values.clear();
         return conf;
+    }
+    public static void createEmptyPropertiesFile(String path) {
+        try {
+            File file = new File(path);
+            file.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
     // deletes given string from StringBuilder
     private void delete(String str2rem, StringBuilder sb){
