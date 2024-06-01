@@ -19,6 +19,7 @@ public class SeclosiaUtilsConfigUtils {
 
     public static void removeKeys(Properties prop, List<String> ctr){
         for(String k : ctr){
+            System.out.println("Removing: " + k);
             prop.remove(k);
         }
     }
