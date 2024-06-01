@@ -3,6 +3,7 @@ package net.mrquba.seclosia;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.server.command.CommandManager;
@@ -15,11 +16,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
-import java.util.HashSet;
-import java.util.Set;
-
 public class SeclosiaUtils implements ModInitializer {
 	public List<Pair<String, String>> commands = new LinkedList<>();
+	public List<String> CommandsToRemove = new LinkedList<>();
+	public List<String> LocationsToRemove = new LinkedList<>();
 	public List<Pair<String, Vec3i>> locations = new LinkedList<>();
 	public static final String MOD_ID = "seclosiautils";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
@@ -36,26 +36,42 @@ public class SeclosiaUtils implements ModInitializer {
 			this.commands.clear();
 			this.locations = conf.loadConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, true);
 			init(SeclosiaUtils.dispatcher, true);
-			executionCommandRegistration(dispatcher, "seclosia", "get_seed", "seed");
-			addCommandRegistration(dispatcher, "seclosia");
+			executionCommandRegistration(dispatcher, "get_seed", "seed");
+			addCommandRegistration(dispatcher);
+			removeCommandRegistration(dispatcher);
 		});
 	}
 
-	private void executionCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String literal, String args, String result) {
-		dispatcher.register(CommandManager.literal(literal)
+	private void removeCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher) {
+		dispatcher.register(CommandManager.literal("seclosia")
+				.then(CommandManager.literal("remove")
+						.then(removeSubCommand("shortcut", this.CommandsToRemove))
+						.then(removeSubCommand("location", this.LocationsToRemove))
+						));
+	}
+	private LiteralArgumentBuilder<ServerCommandSource> removeSubCommand(String literal, List<String> list){
+		return CommandManager.literal(literal)
+				.then(CommandManager.argument("name", StringArgumentType.string()))
+				.executes(context -> {
+					list.add((StringArgumentType.getString(context, "name")));
+					return  1;
+				});
+	}
+	private void executionCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String args, String result) {
+		dispatcher.register(CommandManager.literal("seclosia")
 				.then(CommandManager.literal(args)
 						.executes(context -> {
 							ServerCommandSource commandSource = context.getSource();
 							dispatcher.execute(result, commandSource);
 							context.getSource().sendFeedback(() ->
-							Text.literal("Executed command %s".formatted(result)), false);
+									Text.literal("Executed command %s".formatted(result)), false);
 							return 1;
 						}))
 		);
 	}
-	private void executionCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String literal, String args, String name, Vec3i pos) {
-		dispatcher.register(CommandManager.literal(literal)
-				.then(CommandManager.literal(args)
+	private void executionCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String name, Vec3i pos) {
+		dispatcher.register(CommandManager.literal("seclosia")
+				.then(CommandManager.literal("location")
 						.then(CommandManager.literal(name)
 						.executes(context -> {
 							context.getSource().sendFeedback(() ->
@@ -65,8 +81,8 @@ public class SeclosiaUtils implements ModInitializer {
 		);
 	}
 
-	private void addCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String literal) {
-		dispatcher.register(CommandManager.literal(literal)
+	private void addCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher) {
+		dispatcher.register(CommandManager.literal("seclosia")
 				.then(CommandManager.literal("add")
 						.then(CommandManager.argument("shortcut", StringArgumentType.string())
 								.then(CommandManager.argument("command", StringArgumentType.greedyString())
@@ -105,16 +121,17 @@ public class SeclosiaUtils implements ModInitializer {
 
 	private void init(CommandDispatcher<ServerCommandSource> dispatcher) {
 		for (Pair<String, String> s : this.commands) {
-			executionCommandRegistration(dispatcher, "seclosia", s.getLeft(), s.getRight());
+			executionCommandRegistration(dispatcher, s.getLeft(), s.getRight());
 		}
-		conf.saveConfig(SeclosiaUtilsConfig.COMMANDS_FILE, this.commands);
+		conf.saveConfig(SeclosiaUtilsConfig.COMMANDS_FILE, this.commands, this.CommandsToRemove);
 		this.commands.clear();
+		this.CommandsToRemove.clear();
 	}
 	private void init(CommandDispatcher<ServerCommandSource> dispatcher, boolean location) {
 		for (Pair<String, Vec3i> s : this.locations) {
-			executionCommandRegistration(dispatcher, "seclosia", "location", s.getLeft(), s.getRight());
+			executionCommandRegistration(dispatcher, s.getLeft(), s.getRight());
 		}
-		conf.saveConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, this.locations);
+		conf.saveConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, this.locations, LocationsToRemove);
 		this.locations.clear();
 	}
 }
