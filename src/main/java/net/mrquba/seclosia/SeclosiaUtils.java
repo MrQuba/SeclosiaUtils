@@ -22,10 +22,12 @@ public class SeclosiaUtils implements ModInitializer {
 	public List<Pair<String, String>> commands = new LinkedList<>();
 	public List<String> CommandsToRemove = new LinkedList<>();
 	public List<String> LocationsToRemove = new LinkedList<>();
+	public List<String> MacrosToRemove = new LinkedList<>();
 	public List<Pair<String, Vec3i>> locations = new LinkedList<>();
 	public static final String MOD_ID = "seclosiautils";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 	SeclosiaUtilsConfig conf = new SeclosiaUtilsConfig();
+	public  List<Pair<String, String>> macros = new LinkedList<>();
 
 	private static CommandDispatcher<ServerCommandSource> dispatcher;
 
@@ -38,9 +40,13 @@ public class SeclosiaUtils implements ModInitializer {
 			this.commands.clear();
 			this.locations = conf.loadConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, true);
 			init(SeclosiaUtils.dispatcher, true);
+			this.locations.clear();
 			executionCommandRegistration(dispatcher, "get_seed", "seed");
 			addCommandRegistration(dispatcher);
 			removeCommandRegistration(dispatcher);
+			this.macros = conf.loadConfig(SeclosiaUtilsConfig.MACROS_FILE);
+			init(SeclosiaUtils.dispatcher, 1);
+			this.macros.clear();
 		});
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
 			LOGGER.info("Saving commands");
@@ -55,6 +61,7 @@ public class SeclosiaUtils implements ModInitializer {
 				.then(CommandManager.literal("remove")
 						.then(removeSubCommand("shortcut", this.CommandsToRemove))
 						.then(removeSubCommand("location", this.LocationsToRemove))
+						.then(removeSubCommand("macro", this.MacrosToRemove))
 						));
 	}
 	private LiteralArgumentBuilder<ServerCommandSource> removeSubCommand(String literal, List<String> list){
@@ -89,6 +96,23 @@ public class SeclosiaUtils implements ModInitializer {
 						})))
 		);
 	}
+	private void macroRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String name, String string) {
+		dispatcher.register(CommandManager.literal("seclosia")
+				.then(CommandManager.literal("macro")
+						.then(CommandManager.literal(name)
+								.executes(context -> {
+									context.getSource().sendFeedback(() ->
+											Text.literal("Executing macro %s".formatted(name)), false);
+									String[] splitResults = string.split(",");
+									for(String s : splitResults){
+										context.getSource().sendFeedback(() ->
+												Text.literal("Executing %s".formatted(s)), false);
+										dispatcher.execute(s, context.getSource());
+									}
+									return 1;
+								})))
+		);
+	}
 
 	private void addCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher) {
 		dispatcher.register(CommandManager.literal("seclosia")
@@ -104,6 +128,19 @@ public class SeclosiaUtils implements ModInitializer {
 											init(SeclosiaUtils.dispatcher);
 											return 1;
 										})))
+
+						.then(CommandManager.literal("macro")
+								.then(CommandManager.argument("name", StringArgumentType.string())
+								.then(CommandManager.argument("commands", StringArgumentType.greedyString())
+										.executes(context -> {
+											String macro = StringArgumentType.getString(context, "name");
+											String string = StringArgumentType.getString(context, "commands");
+											this.macros.add(new Pair<>(macro,string));
+											context.getSource().sendFeedback(() ->
+													Text.literal("Added macro %s".formatted(macro)), false);
+											init(SeclosiaUtils.dispatcher, 1);
+											return 1;
+										}))))
 						.then(CommandManager.literal("location")
 								.then(CommandManager.argument("name", StringArgumentType.string())
 										.then(CommandManager.argument("x", IntegerArgumentType.integer())
@@ -149,5 +186,13 @@ public class SeclosiaUtils implements ModInitializer {
 		conf.saveConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, this.locations, this.LocationsToRemove);
 		this.locations.clear();
 		this.LocationsToRemove.clear();
+	}
+	private void init(CommandDispatcher<ServerCommandSource> dispatcher, int macro) {
+		for (Pair<String, String> m : this.macros) {
+			macroRegistration(dispatcher, m.getLeft(), m.getRight());
+		}
+		conf.saveConfig(SeclosiaUtilsConfig.MACROS_FILE, this.macros, this.MacrosToRemove);
+		this.macros.clear();
+		this.MacrosToRemove.clear();
 	}
 }

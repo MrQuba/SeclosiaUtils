@@ -14,6 +14,7 @@ import static java.lang.Character.isDigit;
 public class SeclosiaUtilsConfig {
     public static final File LOCATIONS_FILE = new File("config/seclosia_locations.properties");
     public static final File COMMANDS_FILE = new File("config/seclosia_commands.properties");
+    public static final File MACROS_FILE = new File("config/seclosia_macros.properties");
     private static Properties properties = new Properties();
 
     // Takes File as input and returns Set<Pair<String, String>>
