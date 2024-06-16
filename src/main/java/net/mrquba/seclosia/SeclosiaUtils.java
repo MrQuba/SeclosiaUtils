@@ -7,6 +7,8 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.text.Text;
@@ -28,11 +30,12 @@ public class SeclosiaUtils implements ModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 	SeclosiaUtilsConfig conf = new SeclosiaUtilsConfig();
 	public  List<Pair<String, String>> macros = new LinkedList<>();
-
+	public double mspt;
 	private static CommandDispatcher<ServerCommandSource> dispatcher;
 
 	@Override
 	public void onInitialize() {
+		ServerTickEvents.END_SERVER_TICK.register(this::onEndServerTick);
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			SeclosiaUtils.dispatcher = dispatcher;
 			this.commands = conf.loadConfig(SeclosiaUtilsConfig.COMMANDS_FILE);
@@ -47,6 +50,7 @@ public class SeclosiaUtils implements ModInitializer {
 			this.macros = conf.loadConfig(SeclosiaUtilsConfig.MACROS_FILE);
 			init(SeclosiaUtils.dispatcher, 1);
 			this.macros.clear();
+			displayVariableCommandRegistration(dispatcher, "MSPT: ", this.mspt);
 		});
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
 			LOGGER.info("Saving commands");
@@ -55,7 +59,10 @@ public class SeclosiaUtils implements ModInitializer {
 			saveConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, this.locations, this.LocationsToRemove);
 		});
 	}
-
+	private void onEndServerTick(MinecraftServer server){
+		this.mspt = Arrays.stream(server.lastTickLengths).average().orElse(Double.NaN) /1000000;
+		this.mspt = (double) Math.round(mspt * 10) / 10;
+	}
 	private void removeCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher) {
 		dispatcher.register(CommandManager.literal("seclosia")
 				.then(CommandManager.literal("remove")
@@ -83,6 +90,17 @@ public class SeclosiaUtils implements ModInitializer {
 									Text.literal("Executed command %s".formatted(result)), false);
 							return 1;
 						}))
+		);
+	}
+	private <T> void displayVariableCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String varDisplayText, T var) {
+		dispatcher.register(CommandManager.literal("seclosia")
+				.then(CommandManager.literal("get")
+						.then(CommandManager.literal("mspt")
+						.executes(context -> {
+							context.getSource().sendFeedback(() ->
+									Text.literal("%s: %s".formatted(varDisplayText, var)), true);
+							return 1;
+						})))
 		);
 	}
 	private void executionCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String name, Vec3i pos) {
