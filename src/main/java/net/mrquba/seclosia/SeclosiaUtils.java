@@ -3,7 +3,9 @@ package net.mrquba.seclosia;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -30,9 +32,16 @@ public class SeclosiaUtils implements ModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 	SeclosiaUtilsConfig conf = new SeclosiaUtilsConfig();
 	public  List<Pair<String, String>> macros = new LinkedList<>();
-	public double mspt;
-	private static CommandDispatcher<ServerCommandSource> dispatcher;
+	private double mspt;
+	private double tps;
+	private long lastTickTime  = 0;
+	private long tickCount = 0;
 
+	private static CommandDispatcher<ServerCommandSource> dispatcher;
+@FunctionalInterface
+interface getVar{
+	double get();
+}
 	@Override
 	public void onInitialize() {
 		ServerTickEvents.END_SERVER_TICK.register(this::onEndServerTick);
@@ -50,7 +59,7 @@ public class SeclosiaUtils implements ModInitializer {
 			this.macros = conf.loadConfig(SeclosiaUtilsConfig.MACROS_FILE);
 			init(SeclosiaUtils.dispatcher, 1);
 			this.macros.clear();
-			displayVariableCommandRegistration(dispatcher, "MSPT: ", this.mspt);
+			updateGetCommands(dispatcher);
 		});
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
 			LOGGER.info("Saving commands");
@@ -60,8 +69,18 @@ public class SeclosiaUtils implements ModInitializer {
 		});
 	}
 	private void onEndServerTick(MinecraftServer server){
+		// MSPT
 		this.mspt = Arrays.stream(server.lastTickLengths).average().orElse(Double.NaN) /1000000;
 		this.mspt = (double) Math.round(mspt * 10) / 10;
+		//TPS
+		long currentTime = System.nanoTime();
+		tickCount++;
+		if(tickCount % 20 == 0){
+			long timeElapsed = currentTime - lastTickTime;
+			this.tps = 1_000_000_000.0 / (timeElapsed / 20.0);
+			this.tps = (double)Math.round(this.tps * 10) / 10;
+			lastTickTime = currentTime;
+		}
 	}
 	private void removeCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher) {
 		dispatcher.register(CommandManager.literal("seclosia")
@@ -92,16 +111,19 @@ public class SeclosiaUtils implements ModInitializer {
 						}))
 		);
 	}
-	private <T> void displayVariableCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String varDisplayText, T var) {
+	double getMspt () { return this.mspt; }
+	double getTps () { return this.tps; }
+	private void displayVariableCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String literal, String varDisplayText, getVar var) {
 		dispatcher.register(CommandManager.literal("seclosia")
 				.then(CommandManager.literal("get")
-						.then(CommandManager.literal("mspt")
-						.executes(context -> {
-							context.getSource().sendFeedback(() ->
-									Text.literal("%s: %s".formatted(varDisplayText, var)), true);
-							return 1;
-						})))
+						.then(CommandManager.literal(literal)
+						.executes(context -> displayVariableCommandDisplay(context, varDisplayText, var))))
 		);
+	}
+	private int displayVariableCommandDisplay(CommandContext<ServerCommandSource> context, String varDisplayText, getVar var){
+
+		context.getSource().sendFeedback(() -> Text.literal("%s: %s".formatted(varDisplayText, var.get())), true);
+		return 1;
 	}
 	private void executionCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String name, Vec3i pos) {
 		dispatcher.register(CommandManager.literal("seclosia")
@@ -182,7 +204,10 @@ public class SeclosiaUtils implements ModInitializer {
 						))
 		);
 	}
-
+	private void updateGetCommands(CommandDispatcher<ServerCommandSource> dispatcher){
+		displayVariableCommandRegistration(dispatcher, "mspt", "MSPT: ", this::getMspt);
+		displayVariableCommandRegistration(dispatcher, "tps", "TPS: ", this::getTps);
+	}
 	private void init(CommandDispatcher<ServerCommandSource> dispatcher) {
 		for (Pair<String, String> s : this.commands) {
 			executionCommandRegistration(dispatcher, s.getLeft(), s.getRight());
