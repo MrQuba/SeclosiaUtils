@@ -3,7 +3,6 @@ package net.mrquba.seclosia;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.api.ModInitializer;
@@ -19,8 +18,8 @@ import net.minecraft.util.math.Vec3i;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class SeclosiaUtils implements ModInitializer {
 	public List<Pair<String, String>> commands = new LinkedList<>();
@@ -36,6 +35,8 @@ public class SeclosiaUtils implements ModInitializer {
 	private double tps;
 	private long lastTickTime  = 0;
 	private long tickCount = 0;
+	private boolean tpsEnabled = false;
+	private boolean msptEnabled = false;
 
 	private static CommandDispatcher<ServerCommandSource> dispatcher;
 @FunctionalInterface
@@ -47,40 +48,43 @@ interface getVar{
 		ServerTickEvents.END_SERVER_TICK.register(this::onEndServerTick);
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			SeclosiaUtils.dispatcher = dispatcher;
-			this.commands = conf.loadConfig(SeclosiaUtilsConfig.COMMANDS_FILE);
-			init(SeclosiaUtils.dispatcher);
-			this.commands.clear();
-			this.locations = conf.loadConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, true);
-			init(SeclosiaUtils.dispatcher, true);
-			this.locations.clear();
+			CommandUtils.onRegisterEvent(dispatcher,this.commands, SeclosiaUtilsConfig.COMMANDS_FILE, this::executionCommandRegistration, this.CommandsToRemove);
+			CommandUtils.onRegisterEvent(dispatcher,this.locations, SeclosiaUtilsConfig.LOCATIONS_FILE, this::locationRegistration, this.LocationsToRemove, true);
+			CommandUtils.onRegisterEvent(dispatcher,this.macros, SeclosiaUtilsConfig.MACROS_FILE, this::macroRegistration, this.MacrosToRemove);
 			executionCommandRegistration(dispatcher, "get_seed", "seed");
 			addCommandRegistration(dispatcher);
 			removeCommandRegistration(dispatcher);
-			this.macros = conf.loadConfig(SeclosiaUtilsConfig.MACROS_FILE);
-			init(SeclosiaUtils.dispatcher, 1);
-			this.macros.clear();
 			updateGetCommands(dispatcher);
+			switchCommandRegistration(dispatcher);
 		});
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
 			LOGGER.info("Saving commands");
-			saveConfig(SeclosiaUtilsConfig.COMMANDS_FILE, this.commands, this.CommandsToRemove);
+			CommandUtils.saveConfig(SeclosiaUtilsConfig.COMMANDS_FILE, this.commands, this.CommandsToRemove);
 			LOGGER.info("Saving locations");
-			saveConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, this.locations, this.LocationsToRemove);
+			CommandUtils.saveConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, this.locations, this.LocationsToRemove);
+			LOGGER.info("Saving macros");
+			CommandUtils.saveConfig(SeclosiaUtilsConfig.MACROS_FILE, this.macros, this.MacrosToRemove);
 		});
 	}
 	private void onEndServerTick(MinecraftServer server){
 		// MSPT
-		this.mspt = Arrays.stream(server.lastTickLengths).average().orElse(Double.NaN) /1000000;
-		this.mspt = (double) Math.round(mspt * 10) / 10;
-		//TPS
-		long currentTime = System.nanoTime();
-		tickCount++;
-		if(tickCount % 20 == 0){
-			long timeElapsed = currentTime - lastTickTime;
-			this.tps = 1_000_000_000.0 / (timeElapsed / 20.0);
-			this.tps = (double)Math.round(this.tps * 10) / 10;
-			lastTickTime = currentTime;
+		if(msptEnabled){
+			this.mspt = Arrays.stream(server.lastTickLengths).average().orElse(Double.NaN) /1000000;
+			this.mspt = (double) Math.round(mspt * 10) / 10;
 		}
+		else mspt = -1;
+		//TPS
+		if(tpsEnabled){
+			long currentTime = System.nanoTime();
+			tickCount++;
+			if(tickCount % 20 == 0){
+				long timeElapsed = currentTime - lastTickTime;
+				this.tps = 1_000_000_000.0 / (timeElapsed / 20.0);
+				this.tps = (double)Math.round(this.tps * 10) / 10;
+				lastTickTime = currentTime;
+			}
+		}
+		else tps = -1;
 	}
 	private void removeCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher) {
 		dispatcher.register(CommandManager.literal("seclosia")
@@ -90,6 +94,24 @@ interface getVar{
 						.then(removeSubCommand("macro", this.MacrosToRemove))
 						));
 	}
+	private void switchCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher) {
+		dispatcher.register(CommandManager.literal("seclosia")
+				.then(CommandManager.literal("enable")
+						.then(switchSubCommand("tps", this.tpsEnabled))
+						.then(switchSubCommand("mspt", this.msptEnabled))
+				));
+	}
+	private LiteralArgumentBuilder<ServerCommandSource> switchSubCommand(String literal, boolean var_switch){
+		AtomicReference<Boolean> sw = new AtomicReference<>(var_switch);
+		return CommandManager.literal(literal)
+						.executes(context ->{
+							sw.set(!sw.get());
+							context.getSource().sendFeedback(() ->
+									Text.literal("Switch: %s".formatted(sw.get())), false);
+							return  1;
+						});
+	}
+
 	private LiteralArgumentBuilder<ServerCommandSource> removeSubCommand(String literal, List<String> list){
 		return CommandManager.literal(literal)
 				.then(CommandManager.argument("name", StringArgumentType.word())
@@ -122,10 +144,10 @@ interface getVar{
 	}
 	private int displayVariableCommandDisplay(CommandContext<ServerCommandSource> context, String varDisplayText, getVar var){
 
-		context.getSource().sendFeedback(() -> Text.literal("%s: %s".formatted(varDisplayText, var.get())), true);
+		context.getSource().sendFeedback(() -> Text.literal("%s %s".formatted(varDisplayText, (var.get() < 0) ? "is not being tracked" : var.get())), true);
 		return 1;
 	}
-	private void executionCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String name, Vec3i pos) {
+	private void locationRegistration(CommandDispatcher<ServerCommandSource> dispatcher, String name, Vec3i pos) {
 		dispatcher.register(CommandManager.literal("seclosia")
 				.then(CommandManager.literal("location")
 						.then(CommandManager.literal(name)
@@ -165,7 +187,7 @@ interface getVar{
 											this.commands.add(new Pair<>(shortcut, command));
 											context.getSource().sendFeedback(() ->
 													Text.literal("Added shortcut %s for command: %s".formatted(shortcut, command)), false);
-											init(SeclosiaUtils.dispatcher);
+											CommandUtils.init(dispatcher, this.commands, SeclosiaUtilsConfig.COMMANDS_FILE, this::executionCommandRegistration, this.CommandsToRemove);
 											return 1;
 										})))
 
@@ -178,7 +200,7 @@ interface getVar{
 											this.macros.add(new Pair<>(macro,string));
 											context.getSource().sendFeedback(() ->
 													Text.literal("Added macro %s".formatted(macro)), false);
-											init(SeclosiaUtils.dispatcher, 1);
+											CommandUtils.init(dispatcher, this.macros, SeclosiaUtilsConfig.MACROS_FILE, this::macroRegistration, this.MacrosToRemove);
 											return 1;
 										}))))
 						.then(CommandManager.literal("location")
@@ -194,7 +216,7 @@ interface getVar{
 																			this.locations.add(new Pair<>(locationName, locationPos));
 																			context.getSource().sendFeedback(() ->
 																					Text.literal("Added location %s at coordinates: %s".formatted(locationName, locationPos)), false);
-																			init(SeclosiaUtils.dispatcher, true);
+																			CommandUtils.init(dispatcher, this.locations, SeclosiaUtilsConfig.LOCATIONS_FILE, this::locationRegistration, this.LocationsToRemove);
                                                                             return 1;
                                                                         })
 																)
@@ -207,35 +229,5 @@ interface getVar{
 	private void updateGetCommands(CommandDispatcher<ServerCommandSource> dispatcher){
 		displayVariableCommandRegistration(dispatcher, "mspt", "MSPT: ", this::getMspt);
 		displayVariableCommandRegistration(dispatcher, "tps", "TPS: ", this::getTps);
-	}
-	private void init(CommandDispatcher<ServerCommandSource> dispatcher) {
-		for (Pair<String, String> s : this.commands) {
-			executionCommandRegistration(dispatcher, s.getLeft(), s.getRight());
-		}
-		conf.saveConfig(SeclosiaUtilsConfig.COMMANDS_FILE, this.commands, this.CommandsToRemove);
-		this.commands.clear();
-		this.CommandsToRemove.clear();
-	}
-	private <T, U> void saveConfig(File file, List<Pair<T, U>> lp, List<String> ctr){
-
-		conf.saveConfig(file, lp, ctr);
-		lp.clear();
-		ctr.clear();
-	}
-	private void init(CommandDispatcher<ServerCommandSource> dispatcher, boolean location) {
-		for (Pair<String, Vec3i> s : this.locations) {
-			executionCommandRegistration(dispatcher, s.getLeft(), s.getRight());
-		}
-		conf.saveConfig(SeclosiaUtilsConfig.LOCATIONS_FILE, this.locations, this.LocationsToRemove);
-		this.locations.clear();
-		this.LocationsToRemove.clear();
-	}
-	private void init(CommandDispatcher<ServerCommandSource> dispatcher, int macro) {
-		for (Pair<String, String> m : this.macros) {
-			macroRegistration(dispatcher, m.getLeft(), m.getRight());
-		}
-		conf.saveConfig(SeclosiaUtilsConfig.MACROS_FILE, this.macros, this.MacrosToRemove);
-		this.macros.clear();
-		this.MacrosToRemove.clear();
 	}
 }
