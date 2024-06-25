@@ -1,8 +1,7 @@
 package net.mrquba.seclosia;
+import net.fabricmc.loader.impl.lib.sat4j.core.Vec;
 import net.minecraft.util.Pair;
 import net.minecraft.util.math.Vec3i;
-import org.apache.commons.lang3.tuple.Triple;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.util.*;
@@ -34,9 +33,9 @@ public class SeclosiaUtilsConfig {
                 values.add(value);
 
             }
-            conf = SeclosiaUtilsConfigUtils.zipLists(keyRing, values);
+            conf = ConfigUtils.zipLists(keyRing, values);
         } catch (IOException e) {
-            SeclosiaUtilsConfigUtils.createEmptyPropertiesFile("config/seclosia_commands.properties");
+            ConfigUtils.createEmptyPropertiesFile("config/seclosia_commands.properties");
         }
         properties.clear();
         properties = new Properties();
@@ -45,7 +44,7 @@ public class SeclosiaUtilsConfig {
         return conf;
     }
 
-        // Takes File and boolean as input and returns Set<Pair<String, String>>
+    // Takes File and boolean as input and returns Set<Pair<String, String>>
     // (boolean is used to differentiate between two functions, this one is used for locations)
     // Pre-defined files SeclosiaUtilsConfig::COMMANDS_FILE, SeclosiaUtilsConfig::LOCATIONS_FILE
     public List<Pair<String, Vec3i>> loadConfig(File file, boolean locations) {
@@ -71,9 +70,9 @@ public class SeclosiaUtilsConfig {
             }
 
         } catch (IOException e) {
-            SeclosiaUtilsConfigUtils.createEmptyPropertiesFile("config/seclosia_locations.properties");
+                ConfigUtils.createEmptyPropertiesFile("config/seclosia_locations.properties");
         }
-        conf = SeclosiaUtilsConfigUtils.zipLists(keyRing, values);
+        conf = ConfigUtils.zipLists(keyRing, values);
         properties.clear();
         properties = new Properties();
         keyRing.clear();
@@ -81,15 +80,15 @@ public class SeclosiaUtilsConfig {
         return conf;
     }
     public <T, U> void  saveConfig(File file, List<Pair<T, U>> s, List<String> ctr) {
-        properties = SeclosiaUtilsConfigUtils.getProperties(file);
+        properties = ConfigUtils.getProperties(file);
         if(ctr != null){
-            SeclosiaUtilsConfigUtils.removeKeys(properties, ctr);
+            ConfigUtils.removeKeys(properties, ctr);
         }
         try (FileWriter writer = new FileWriter(file)) {
             for (Pair<T, U> p : s) {
                 T key = p.getLeft();
                 U value = p.getRight();
-                    if (!SeclosiaUtilsConfigUtils.isPairNull(key, value)) {
+                    if (!ConfigUtils.isPairNull(key, value)) {
                         properties.setProperty(key.toString(), value.toString());
                     }
             }

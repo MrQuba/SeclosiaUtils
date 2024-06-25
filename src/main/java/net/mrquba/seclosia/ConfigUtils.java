@@ -1,6 +1,7 @@
 package net.mrquba.seclosia;
 
 import net.minecraft.util.Pair;
+import net.minecraft.util.math.Vec3i;
 
 import java.io.File;
 import java.io.FileReader;
@@ -10,7 +11,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
-public class SeclosiaUtilsConfigUtils {
+public class ConfigUtils {
 
     // changes String to Integer
     public static int StringBuilderToInt(StringBuilder x_sb){
