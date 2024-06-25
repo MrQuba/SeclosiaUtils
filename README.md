@@ -49,5 +49,23 @@ Macros work like command shortcuts, but allow for executing multiple commands
 /secloia add macro helloworld say Hello,say World!
 /seclosia macro helloworld
 ```
+## TPS & MSPT
+This is disabled by default, to enable it use [#6](https://github.com/MrQuba/SeclosiaUtils/issues/6) :
+```
+/seclosia enable mspt
+```
+and
+```
+/seclosia enable tps
+```
+To get value you use commands:
+```
+/seclosia get mspt
+```
+and
+```
+/seclosia get tps
+```
 ## Notes
-You do not need to restart server to use those commands, but they won't appear in suggestions before you do so
+You do not need to restart server to use those commands, but they won't appear in suggestions before you do so. \
+
