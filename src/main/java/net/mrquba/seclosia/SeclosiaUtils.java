@@ -43,6 +43,10 @@ public class SeclosiaUtils implements ModInitializer {
 interface getVar{
 	double get();
 }
+	@FunctionalInterface
+	interface toggle{
+		double toggle(CommandContext<ServerCommandSource> context);
+	}
 	@Override
 	public void onInitialize() {
 		ServerTickEvents.END_SERVER_TICK.register(this::onEndServerTick);
@@ -97,21 +101,28 @@ interface getVar{
 	private void switchCommandRegistration(CommandDispatcher<ServerCommandSource> dispatcher) {
 		dispatcher.register(CommandManager.literal("seclosia")
 				.then(CommandManager.literal("enable")
-						.then(switchSubCommand("tps", this.tpsEnabled))
-						.then(switchSubCommand("mspt", this.msptEnabled))
+						.then(CommandManager.literal("tps")
+								.executes(this::toggleTPS))
+						.then(CommandManager.literal("mspt")
+								.executes(this::toggleMSPT))
 				));
 	}
-	private LiteralArgumentBuilder<ServerCommandSource> switchSubCommand(String literal, boolean var_switch){
-		AtomicReference<Boolean> sw = new AtomicReference<>(var_switch);
-		return CommandManager.literal(literal)
-						.executes(context ->{
-							sw.set(!sw.get());
-							context.getSource().sendFeedback(() ->
-									Text.literal("Switch: %s".formatted(sw.get())), false);
-							return  1;
-						});
-	}
+	private int toggleMSPT(CommandContext<ServerCommandSource> context) {
+		msptEnabled = !msptEnabled;
 
+		context.getSource().sendFeedback(() ->
+				Text.literal("Switch: %s".formatted(msptEnabled)), false);
+
+		return 1;
+	}
+	private int toggleTPS(CommandContext<ServerCommandSource> context) {
+		tpsEnabled = !tpsEnabled;
+
+		context.getSource().sendFeedback(() ->
+				Text.literal("Switch: %s".formatted(tpsEnabled)), false);
+
+		return 1;
+	}
 	private LiteralArgumentBuilder<ServerCommandSource> removeSubCommand(String literal, List<String> list){
 		return CommandManager.literal(literal)
 				.then(CommandManager.argument("name", StringArgumentType.word())
@@ -143,7 +154,7 @@ interface getVar{
 		);
 	}
 	private int displayVariableCommandDisplay(CommandContext<ServerCommandSource> context, String varDisplayText, getVar var){
-
+		System.out.println(var.get());
 		context.getSource().sendFeedback(() -> Text.literal("%s %s".formatted(varDisplayText, (var.get() < 0) ? "is not being tracked" : var.get())), true);
 		return 1;
 	}
