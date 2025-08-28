@@ -73,7 +73,7 @@ interface getVar{
 	private void onEndServerTick(MinecraftServer server){
 		// MSPT
 		if(msptEnabled){
-			this.mspt = Arrays.stream(server.lastTickLengths).average().orElse(Double.NaN) /1000000;
+			this.mspt = Arrays.stream(server.getTickTimes()).average().orElse(Double.NaN) /1000000;
 			this.mspt = (double) Math.round(mspt * 10) / 10;
 		}
 		else mspt = -1;
