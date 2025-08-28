@@ -19,7 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class SeclosiaUtils implements ModInitializer {
 	public List<Pair<String, String>> commands = new LinkedList<>();
@@ -29,7 +28,6 @@ public class SeclosiaUtils implements ModInitializer {
 	public List<Pair<String, Vec3i>> locations = new LinkedList<>();
 	public static final String MOD_ID = "seclosiautils";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-	SeclosiaUtilsConfig conf = new SeclosiaUtilsConfig();
 	public  List<Pair<String, String>> macros = new LinkedList<>();
 	private double mspt;
 	private double tps;
@@ -37,21 +35,14 @@ public class SeclosiaUtils implements ModInitializer {
 	private long tickCount = 0;
 	private boolean tpsEnabled = false;
 	private boolean msptEnabled = false;
-
-	private static CommandDispatcher<ServerCommandSource> dispatcher;
 @FunctionalInterface
 interface getVar{
 	double get();
 }
-	@FunctionalInterface
-	interface toggle{
-		double toggle(CommandContext<ServerCommandSource> context);
-	}
 	@Override
 	public void onInitialize() {
 		ServerTickEvents.END_SERVER_TICK.register(this::onEndServerTick);
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-			SeclosiaUtils.dispatcher = dispatcher;
 			CommandUtils.onRegisterEvent(dispatcher,this.commands, SeclosiaUtilsConfig.COMMANDS_FILE, this::executionCommandRegistration, this.CommandsToRemove);
 			CommandUtils.onRegisterEvent(dispatcher,this.locations, SeclosiaUtilsConfig.LOCATIONS_FILE, this::locationRegistration, this.LocationsToRemove, true);
 			CommandUtils.onRegisterEvent(dispatcher,this.macros, SeclosiaUtilsConfig.MACROS_FILE, this::macroRegistration, this.MacrosToRemove);
